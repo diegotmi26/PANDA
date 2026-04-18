@@ -1,19 +1,24 @@
 import streamlit as st
 from google import genai
-import time
 
 # 1. Configuração da Interface
 st.set_page_config(page_title="Consultoria A.I.D.A.", page_icon="🤖", layout="centered")
 
 st.title("🤖 Assistente de Vendas e Backoffice")
+st.caption("Versão Gemini 3 - Alta Performance")
 st.markdown("---")
 
-# 2. Conexão Segura com a API (Secrets)
+# 2. Conexão Segura com a API (Secrets do Streamlit Cloud)
 if "GEMINI_API_KEY" not in st.secrets:
-    st.error("ERRO: Configure a 'GEMINI_API_KEY' nos Secrets do Streamlit Cloud.")
+    st.error("ERRO: Configure a 'GEMINI_API_KEY' nos Secrets do Streamlit.")
     st.stop()
 
-client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+# Usando cache para não recriar o cliente a cada interação
+@st.cache_resource
+def get_client():
+    return genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+
+client = get_client()
 
 # 3. Inicialização do Histórico
 if "messages" not in st.session_state:
@@ -32,53 +37,26 @@ if prompt := st.chat_input("Como posso ajudar com os contratos hoje?"):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # 5. Resposta do Assistente com Ajuste de Tempo e Retentativa
+    # 5. Resposta Direta do Assistente
     with st.chat_message("assistant"):
         placeholder = st.empty()
         
-        # Ordem de preferência de modelos (Gemini 3 e 2)
-        model_options = ["gemini-2.0-flash", "gemini-2.0-flash-exp"]
-        
-        success = False
-        max_retries = 3  # Tenta até 3 vezes se houver erro de tempo (429)
-        retry_delay = 10 # Espera 10 segundos entre as tentativas
-
-        for model_name in model_options:
-            if success: break
+        try:
+            # Chamada direta ao Gemini 3 Flash
+            response = client.models.generate_content(
+                model="gemini-3-flash", 
+                contents=prompt
+            )
             
-            for attempt in range(max_retries):
-                try:
-                    response = client.models.generate_content(
-                        model=model_name,
-                        contents=prompt
-                    )
-                    
-                    output_text = response.text
-                    placeholder.markdown(output_text)
-                    st.session_state.messages.append({"role": "assistant", "content": output_text})
-                    success = True
-                    break # Sai do loop de retentativa se der certo
-                    
-                except Exception as e:
-                    error_str = str(e).upper()
-                    
-                    # AJUSTE DE TEMPO: Se for erro 429, espera e tenta de novo
-                    if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-                        if attempt < max_retries - 1:
-                            placeholder.warning(f"⏳ Limite de tempo atingido. Tentando novamente em {retry_delay}s... (Tentativa {attempt + 1}/{max_retries})")
-                            time.sleep(retry_delay)
-                            placeholder.empty() # Limpa o aviso para a próxima tentativa
-                        else:
-                            st.error("❌ Limite de requisições excedido. Por favor, aguarde 30 segundos e tente novamente manualmente.")
-                            break
-                    
-                    # Erro 404: Passa para o próximo modelo da lista (gemini-2.0-flash-exp)
-                    elif "404" in error_str:
-                        break # Sai do loop de retentativa e vai para o próximo modelo
-                    
-                    else:
-                        st.error(f"Erro técnico: {e}")
-                        break
-
-        if not success and "404" in error_str:
-            st.error("Nenhum modelo compatível foi encontrado. Verifique se o nome do modelo foi descontinuado.")
+            output_text = response.text
+            placeholder.markdown(output_text)
+            st.session_state.messages.append({"role": "assistant", "content": output_text})
+            
+        except Exception as e:
+            error_str = str(e).upper()
+            if "429" in error_str:
+                st.warning("⚠️ Cota temporária atingida. Aguarde alguns instantes.")
+            elif "404" in error_str:
+                st.error("❌ Modelo Gemini 3 não encontrado nesta região/chave.")
+            else:
+                st.error(f"Erro técnico: {e}")
