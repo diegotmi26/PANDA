@@ -8,7 +8,7 @@ st.markdown("---")
 
 # --- CONEXÃO COM A API ---
 # Use a chave que começa com AIza... que você gerou no AI Studio
-API_KEY = "COLE_AQUI_SUA_CHAVE_PANDA" 
+API_KEY = "AIzaSyDPEwcdfPkdDIKtUh7XWkw0nK-GvQTC6u0" 
 client = genai.Client(api_key=API_KEY)
 
 # Configurações do modelo baseado na sua imagem
