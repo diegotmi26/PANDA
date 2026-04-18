@@ -31,7 +31,7 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # Campo de entrada do usuário
-if prompt := st.chat_input("Ex: Posso vender Netflix no B2B?"):
+if prompt := st.chat_input("Ex: QUAL SUA DUVIDA?"):
     # Adiciona mensagem do usuário ao histórico
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
