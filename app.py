@@ -1,59 +1,44 @@
 import streamlit as st
-from google import genai
+import google.generativeai as genai
+import os
 
-# 1. Configuração da Interface
-st.set_page_config(page_title="Consultoria A.I.D.A.", page_icon="🤖", layout="centered")
+# 1. Configuração de Segurança e API
+# No Gemini 3, a biblioteca deve estar na versão 0.8.0 ou superior
+api_key = os.getenv("GOOGLE_API_KEY")
+genai.configure(api_key=api_key)
 
-st.title("🤖 Assistente de Vendas e Backoffice")
-st.caption("Conectado via Gemini 2.0 Flash (Alta Velocidade)")
-st.markdown("---")
+# 2. Seleção do Modelo Atualizado
+# ATENÇÃO: Substituímos o 1.5 pelo 'gemini-3-flash'
+MODEL_ID = 'gemini-3-flash'
 
-# 2. Conexão Segura com a API
-if "GEMINI_API_KEY" not in st.secrets:
-    st.error("ERRO: Configure a 'GEMINI_API_KEY' nos Secrets do Streamlit Cloud.")
-    st.stop()
+# 3. Configuração do Agente (System Instruction)
+# Aqui é onde você define a "alma" do seu assistente
+instruction = "Você é um especialista em backoffice de telecomunicações para o mercado brasileiro."
 
-# Cache do cliente para evitar processos duplicados
-@st.cache_resource
-def get_client():
-    return genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+model = genai.GenerativeModel(
+    model_name=MODEL_ID,
+    system_instruction=instruction
+)
 
-client = get_client()
+# 4. Interface Streamlit
+st.set_page_config(page_title="Agente Telecom Gemini 3")
+st.title("Conexão Gemini 3 - Google AI Studio")
 
-# 3. Inicialização do Histórico
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+if "chat" not in st.session_state:
+    st.session_state.chat = model.start_chat(history=[])
 
-# Exibir histórico
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# Exibição de mensagens
+for content in st.session_state.chat.history:
+    role = "assistant" if content.role == "model" else "user"
+    with st.chat_message(role):
+        st.markdown(content.parts[0].text)
 
-# 4. Entrada do Usuário
-if prompt := st.chat_input("Como posso ajudar hoje?"):
-    
-    st.session_state.messages.append({"role": "user", "content": prompt})
+# Entrada de novas perguntas
+if prompt := st.chat_input("Como posso ajudar?"):
     with st.chat_message("user"):
         st.markdown(prompt)
-
-    # 5. Resposta Instantânea
+    
+    response = st.session_state.chat.send_message(prompt)
+    
     with st.chat_message("assistant"):
-        try:
-            # Usando gemini-2.0-flash para evitar o erro 404 de "não encontrado"
-            response = client.models.generate_content(
-                model="gemini-2.0-flash", 
-                contents=prompt
-            )
-            
-            output_text = response.text
-            st.markdown(output_text)
-            st.session_state.messages.append({"role": "assistant", "content": output_text})
-            
-        except Exception as e:
-            error_msg = str(e).upper()
-            if "429" in error_msg:
-                st.error("⚠️ Limite de cota atingido. Como a conta é nova, aguarde 1 minuto.")
-            elif "404" in error_msg:
-                st.error("❌ Modelo não disponível. Tente trocar para 'gemini-1.5-flash' no código.")
-            else:
-                st.error(f"Erro inesperado: {e}")
+        st.markdown(response.text)
