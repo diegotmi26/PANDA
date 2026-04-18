@@ -32,45 +32,53 @@ if prompt := st.chat_input("Como posso ajudar com os contratos hoje?"):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # 5. Resposta do Assistente com Tratamento de Erros (404 e 429)
+    # 5. Resposta do Assistente com Ajuste de Tempo e Retentativa
     with st.chat_message("assistant"):
         placeholder = st.empty()
         
-        # Lista de modelos por ordem de preferência para evitar o erro 404
-        # O modelo 'gemini-2.0-flash' é o mais estável para a v1beta atualmente
+        # Ordem de preferência de modelos (Gemini 3 e 2)
         model_options = ["gemini-2.0-flash", "gemini-2.0-flash-exp"]
         
         success = False
+        max_retries = 3  # Tenta até 3 vezes se houver erro de tempo (429)
+        retry_delay = 10 # Espera 10 segundos entre as tentativas
+
         for model_name in model_options:
             if success: break
             
-            try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=prompt
-                )
-                
-                output_text = response.text
-                placeholder.markdown(output_text)
-                st.session_state.messages.append({"role": "assistant", "content": output_text})
-                success = True
-                
-            except Exception as e:
-                error_str = str(e).upper()
-                
-                # Tratamento do Erro 429 (Quota Exceeded) do seu print
-                if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-                    st.warning("⚠️ Limite de uso atingido. Aguarde 30 segundos para a próxima pergunta.")
-                    time.sleep(2)
-                    break 
-                
-                # Tratamento do Erro 404 (Not Found) - Tenta o próximo modelo da lista
-                elif "404" in error_str:
-                    continue
-                
-                else:
-                    st.error(f"Erro técnico: {e}")
-                    break
+            for attempt in range(max_retries):
+                try:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt
+                    )
+                    
+                    output_text = response.text
+                    placeholder.markdown(output_text)
+                    st.session_state.messages.append({"role": "assistant", "content": output_text})
+                    success = True
+                    break # Sai do loop de retentativa se der certo
+                    
+                except Exception as e:
+                    error_str = str(e).upper()
+                    
+                    # AJUSTE DE TEMPO: Se for erro 429, espera e tenta de novo
+                    if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                        if attempt < max_retries - 1:
+                            placeholder.warning(f"⏳ Limite de tempo atingido. Tentando novamente em {retry_delay}s... (Tentativa {attempt + 1}/{max_retries})")
+                            time.sleep(retry_delay)
+                            placeholder.empty() # Limpa o aviso para a próxima tentativa
+                        else:
+                            st.error("❌ Limite de requisições excedido. Por favor, aguarde 30 segundos e tente novamente manualmente.")
+                            break
+                    
+                    # Erro 404: Passa para o próximo modelo da lista (gemini-2.0-flash-exp)
+                    elif "404" in error_str:
+                        break # Sai do loop de retentativa e vai para o próximo modelo
+                    
+                    else:
+                        st.error(f"Erro técnico: {e}")
+                        break
 
         if not success and "404" in error_str:
-            st.error("Nenhum modelo compatível foi encontrado na sua região de API.")
+            st.error("Nenhum modelo compatível foi encontrado. Verifique se o nome do modelo foi descontinuado.")
