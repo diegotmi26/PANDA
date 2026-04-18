@@ -1,44 +1,51 @@
 import streamlit as st
-import google.generativeai as genai
+import google_genai as genai # A nova biblioteca que substituiu a generativeai
 import os
 
-# 1. Configuração de Segurança e API
-# No Gemini 3, a biblioteca deve estar na versão 0.8.0 ou superior
-api_key = os.getenv("GOOGLE_API_KEY")
-genai.configure(api_key=api_key)
+# Configuração da página
+st.set_page_config(page_title="Agente Gemini 3", layout="centered")
 
-# 2. Seleção do Modelo Atualizado
-# ATENÇÃO: Substituímos o 1.5 pelo 'gemini-3-flash'
-MODEL_ID = 'gemini-3-flash'
+# Configuração do Cliente Gemini 3
+# A nova SDK utiliza o objeto Client para gerir a ligação
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+MODEL_ID = "gemini-3-flash"
 
-# 3. Configuração do Agente (System Instruction)
-# Aqui é onde você define a "alma" do seu assistente
-instruction = "Você é um especialista em backoffice de telecomunicações para o mercado brasileiro."
+st.title("🚀 Interface Oficial Gemini 3")
+st.caption("Conexão via Google AI SDK (Atualizado)")
 
-model = genai.GenerativeModel(
-    model_name=MODEL_ID,
-    system_instruction=instruction
-)
+# Inicialização do histórico
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-# 4. Interface Streamlit
-st.set_page_config(page_title="Agente Telecom Gemini 3")
-st.title("Conexão Gemini 3 - Google AI Studio")
+# Exibição das mensagens
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-if "chat" not in st.session_state:
-    st.session_state.chat = model.start_chat(history=[])
-
-# Exibição de mensagens
-for content in st.session_state.chat.history:
-    role = "assistant" if content.role == "model" else "user"
-    with st.chat_message(role):
-        st.markdown(content.parts[0].text)
-
-# Entrada de novas perguntas
-if prompt := st.chat_input("Como posso ajudar?"):
+# Lógica de Chat
+if prompt := st.chat_input("Diga algo..."):
+    # Adiciona pergunta do usuário
+    st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
-    
-    response = st.session_state.chat.send_message(prompt)
-    
-    with st.chat_message("assistant"):
-        st.markdown(response.text)
+
+    # Chamada ao modelo Gemini 3 usando a nova sintaxe
+    try:
+        response = client.models.generate_content(
+            model=MODEL_ID,
+            contents=prompt,
+            config=genai.types.GenerateContentConfig(
+                system_instruction="Você é um assistente técnico de telecomunicações.",
+                temperature=0.7
+            )
+        )
+        
+        resposta_texto = response.text
+        
+        with st.chat_message("assistant"):
+            st.markdown(resposta_texto)
+        
+        st.session_state.messages.append({"role": "assistant", "content": resposta_texto})
+        
+    except Exception as e:
+        st.error(f"Erro na conexão com Gemini 3: {e}")
