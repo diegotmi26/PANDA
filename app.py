@@ -1,40 +1,46 @@
-import streamlit as st
+# To run this code you need to install the following dependencies:
+# pip install google-genai
+
+import os
 from google import genai
+from google.genai import types
 
-# Configuração da Interface
-st.set_page_config(page_title="PANDA B2B", page_icon="🐼")
-st.title("🐼 PANDA - Inteligência de Dados")
 
-# Conexão Segura com a API
-try:
-    # O app busca a chave nos 'Secrets' que você configurou
-    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+def generate():
+    client = genai.Client(
+        api_key=os.environ.get("GEMINI_API_KEY"),
+    )
 
-    # Configuração do Modelo (Gemini 3 Flash conforme seu laboratório)
-    MODEL_ID = "gemini-3-flash-preview"
-    SYS_INSTRUCT = "Você é o PANDA, assistente B2B. Responda apenas com base nos documentos do projeto."
+    model = "gemini-3-flash-preview"
+    contents = [
+        types.Content(
+            role="user",
+            parts=[
+                types.Part.from_text(text="""INSERT_INPUT_HERE"""),
+            ],
+        ),
+    ]
+    tools = [
+        types.Tool(googleSearch=types.GoogleSearch(
+        )),
+    ]
+    generate_content_config = types.GenerateContentConfig(
+        temperature=0.3,
+        thinking_config=types.ThinkingConfig(
+            thinking_level="HIGH",
+        ),
+        tools=tools,
+    )
 
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+    for chunk in client.models.generate_content_stream(
+        model=model,
+        contents=contents,
+        config=generate_content_config,
+    ):
+        if text := chunk.text:
+            print(text, end="")
 
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+if __name__ == "__main__":
+    generate()
 
-    if prompt := st.chat_input("Como posso ajudar o time de vendas?"):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
 
-        with st.chat_message("assistant"):
-            # Chamada da API 2026
-            response = client.models.generate_content(
-                model=MODEL_ID,
-                contents=prompt,
-                config={'system_instruction': SYS_INSTRUCT}
-            )
-            st.markdown(response.text)
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
-
-except Exception as e:
-    st.error(f"Aguardando configuração: {e}")
