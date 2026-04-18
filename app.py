@@ -1,28 +1,22 @@
 import streamlit as st
-import google.generativeai as genai
+import google.gemini as gemini
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="PANDA - Assistente B2B", page_icon="🐼")
+st.set_page_config(page_title="PANDA B2B", page_icon="🐼")
 st.title("🐼 PANDA - Inteligência de Dados")
 
-# --- CONFIGURAÇÃO DA API ---
-# Use a sua chave que termina em ...E8fQ
-API_KEY = "COLE_SUA_CHAVE_AQUI" 
+# --- CONEXÃO COM A API ATUALIZADA ---
+API_KEY = "SUA_CHAVE_AQUI"
+client = gemini.Client(api_key=API_KEY)
 
-genai.configure(api_key=API_KEY)
+# --- CONFIGURAÇÃO DO ASSISTENTE ---
+# Em 2026, usamos o modelo gemini-2.0-flash para velocidade e gratuidade
+model_id = "gemini-2.0-flash"
 
-# --- CONFIGURAÇÃO DO MODELO ATUALIZADO (2026) ---
-# Mudamos de 'gemini-1.5-flash' para 'gemini-2.0-flash'
-try:
-    model = genai.GenerativeModel(
-        model_name='gemini-2.0-flash', 
-        system_instruction="Você é o PANDA, assistente de vendas B2B. Responda perguntas sobre Ofertas e Banda Larga usando os documentos fornecidos."
-    )
-except:
-    # Caso o 2.0 ainda esteja em rollout na sua região, tentamos o nome genérico
-    model = genai.GenerativeModel(model_name='gemini-flash')
+# Instrução de Sistema
+sys_instruct = "Você é o PANDA. Use os documentos do projeto para responder sobre Ofertas B2B."
 
-# --- HISTÓRICO E CHAT ---
+# --- INTERFACE DE CHAT ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -30,15 +24,23 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("Pergunte algo sobre as ofertas..."):
+if prompt := st.chat_input("Dúvida sobre Banda Larga?"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
         try:
-            response = model.generate_content(prompt)
+            # Nova forma de gerar conteúdo em 2026
+            response = client.models.generate_content(
+                model=model_id,
+                contents=prompt,
+                config=gemini.types.GenerateContentConfig(
+                    system_instruction=sys_instruct,
+                    temperature=0.2
+                )
+            )
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e:
-            st.error(f"Erro na resposta: {e}")
+            st.error(f"Erro na API Gemini 2026: {e}")
