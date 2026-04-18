@@ -1,29 +1,50 @@
 import streamlit as st
 import os
 from google import genai
-from google.genai import types
 
-# 1. Conexão com a Chave do Studio
-client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+# Configuração da Página
+st.set_page_config(page_title="A.I.D.A. Gemini 3", layout="centered")
 
-st.title("A.I.D.A. com Google Search")
+# Inicialização do Cliente
+# Use a variável EXATA que você configurou no Secrets do Streamlit
+api_key = os.getenv("GOOGLE_API_KEY")
+client = genai.Client(api_key=api_key)
 
-if prompt := st.chat_input("Pesquise regras de Telecom..."):
+# ID do modelo para 2026 (Remova o "-preview" se o erro 404 persistir)
+MODEL_ID = "gemini-3-flash"
+
+st.title("🤖 Assistente A.I.D.A.")
+st.caption("Suporte Técnico Telecom | Motor Gemini 3")
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Mostrar histórico
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# Entrada do usuário
+if prompt := st.chat_input("Como posso ajudar?"):
+    st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # 2. Configurações que você trouxe do código do Studio
-    config = types.GenerateContentConfig(
-        temperature=0.3,
-        tools=[types.Tool(googleSearch=types.GoogleSearch())], # Habilita o Google no seu App
-        thinking_config=types.ThinkingConfig(thinking_level="HIGH") # Faz a IA pensar antes de responder
-    )
-
-    # 3. Gerando a resposta com Stream (aparecendo aos poucos)
-    with st.chat_message("assistant"):
+    try:
+        # Chamada simplificada - Evita erro de versão de API v1beta
         response = client.models.generate_content(
-            model="gemini-3-flash",
+            model=MODEL_ID,
             contents=prompt,
-            config=config
+            config={
+                "system_instruction": "Você é a A.I.D.A., especialista em telecomunicações.",
+                "temperature": 0.7
+            }
         )
-        st.markdown(response.text)
+        
+        texto_resposta = response.text
+        with st.chat_message("assistant"):
+            st.markdown(texto_resposta)
+        st.session_state.messages.append({"role": "assistant", "content": texto_resposta})
+
+    except Exception as e:
+        st.error(f"Erro na conexão: {e}")
