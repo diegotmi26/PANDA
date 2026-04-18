@@ -5,15 +5,15 @@ from google import genai
 st.set_page_config(page_title="Consultoria A.I.D.A.", page_icon="🤖", layout="centered")
 
 st.title("🤖 Assistente de Vendas e Backoffice")
-st.caption("Versão Gemini 3 - Alta Performance")
+st.caption("Conectado via Gemini 2.0 Flash (Alta Velocidade)")
 st.markdown("---")
 
-# 2. Conexão Segura com a API (Secrets do Streamlit Cloud)
+# 2. Conexão Segura com a API
 if "GEMINI_API_KEY" not in st.secrets:
-    st.error("ERRO: Configure a 'GEMINI_API_KEY' nos Secrets do Streamlit.")
+    st.error("ERRO: Configure a 'GEMINI_API_KEY' nos Secrets do Streamlit Cloud.")
     st.stop()
 
-# Usando cache para não recriar o cliente a cada interação
+# Cache do cliente para evitar processos duplicados
 @st.cache_resource
 def get_client():
     return genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
@@ -24,39 +24,36 @@ client = get_client()
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Exibir histórico de mensagens
+# Exibir histórico
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 4. Campo de Entrada
-if prompt := st.chat_input("Como posso ajudar com os contratos hoje?"):
+# 4. Entrada do Usuário
+if prompt := st.chat_input("Como posso ajudar hoje?"):
     
-    # Mostrar mensagem do usuário
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # 5. Resposta Direta do Assistente
+    # 5. Resposta Instantânea
     with st.chat_message("assistant"):
-        placeholder = st.empty()
-        
         try:
-            # Chamada direta ao Gemini 3 Flash
+            # Usando gemini-2.0-flash para evitar o erro 404 de "não encontrado"
             response = client.models.generate_content(
-                model="gemini-3-flash", 
+                model="gemini-2.0-flash", 
                 contents=prompt
             )
             
             output_text = response.text
-            placeholder.markdown(output_text)
+            st.markdown(output_text)
             st.session_state.messages.append({"role": "assistant", "content": output_text})
             
         except Exception as e:
-            error_str = str(e).upper()
-            if "429" in error_str:
-                st.warning("⚠️ Cota temporária atingida. Aguarde alguns instantes.")
-            elif "404" in error_str:
-                st.error("❌ Modelo Gemini 3 não encontrado nesta região/chave.")
+            error_msg = str(e).upper()
+            if "429" in error_msg:
+                st.error("⚠️ Limite de cota atingido. Como a conta é nova, aguarde 1 minuto.")
+            elif "404" in error_msg:
+                st.error("❌ Modelo não disponível. Tente trocar para 'gemini-1.5-flash' no código.")
             else:
-                st.error(f"Erro técnico: {e}")
+                st.error(f"Erro inesperado: {e}")
